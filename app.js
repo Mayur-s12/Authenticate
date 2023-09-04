@@ -96,3 +96,110 @@ app.get("/states/", authenticate, async (request, response) => {
   const getStates = await db.all(getAllStates);
   response.send(getStates.map((each) => dbToResponse(each)));
 });
+
+app.get("/states/:stateId/", authenticate, async (request, response) => {
+  const { stateId } = request.params;
+  const getStateQuery = `
+    SELECT 
+      *
+    FROM 
+      state 
+    WHERE 
+      state_id = ${stateId};`;
+  const state = await db.get(getStateQuery);
+  response.send(dbToResponse(state));
+});
+
+app.post("/districts/", authenticate, async (request, response) => {
+  const { stateId, districtName, cases, cured, active, deaths } = request.body;
+  const postDistrictQuery = `
+  INSERT INTO
+    district (state_id, district_name, cases, cured, active, deaths)
+  VALUES
+    (${stateId}, '${districtName}', ${cases}, ${cured}, ${active}, ${deaths});`;
+  const result = await db.run(postDistrictQuery);
+  response.send("District Successfully Added");
+});
+
+const convertDistrictDbObjectToResponseObject = (dbObject) => {
+  return {
+    districtId: dbObject.district_id,
+    districtName: dbObject.district_name,
+    stateId: dbObject.state_id,
+    cases: dbObject.cases,
+    cured: dbObject.cured,
+    active: dbObject.active,
+    deaths: dbObject.deaths,
+  };
+};
+
+app.get("/districts/:districtId/", authenticate, async (request, response) => {
+  const { districtId } = request.params;
+  const getDistrictsQuery = `
+    SELECT
+      *
+    FROM
+     district
+    WHERE
+      district_id = ${districtId};`;
+  const district = await db.get(getDistrictsQuery);
+  response.send(convertDistrictDbObjectToResponseObject(district));
+});
+
+app.delete(
+  "/districts/:districtId/",
+  authenticate,
+  async (request, response) => {
+    const { districtId } = request.params;
+    const deleteDistrictQuery = `
+  DELETE FROM
+    district
+  WHERE
+    district_id = ${districtId} 
+  `;
+    const del = await db.run(deleteDistrictQuery);
+    response.send("District Removed");
+  }
+);
+
+app.put("/districts/:districtId/", authenticate, async (request, response) => {
+  const { districtId } = request.params;
+  const { districtName, stateId, cases, cured, active, deaths } = request.body;
+  const updateDistrictQuery = `
+  UPDATE
+    district
+  SET
+    district_name = '${districtName}',
+    state_id = ${stateId},
+    cases = ${cases},
+    cured = ${cured},
+    active = ${active}, 
+    deaths = ${deaths}
+  WHERE
+    district_id = ${districtId};
+  `;
+
+  await db.run(updateDistrictQuery);
+  response.send("District Details Updated");
+});
+
+app.get("/states/:stateId/stats/", authenticate, async (request, response) => {
+  const { stateId } = request.params;
+  const getStateStatsQuery = `
+    SELECT
+      SUM(cases),
+      SUM(cured),
+      SUM(active),
+      SUM(deaths)
+    FROM
+      district
+    WHERE
+      state_id=${stateId};`;
+  const stats = await db.get(getStateStatsQuery);
+  response.send({
+    totalCases: stats["SUM(cases)"],
+    totalCured: stats["SUM(cured)"],
+    totalActive: stats["SUM(active)"],
+    totalDeaths: stats["SUM(deaths)"],
+  });
+});
